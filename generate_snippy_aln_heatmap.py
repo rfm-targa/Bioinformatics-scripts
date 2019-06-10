@@ -7,7 +7,8 @@ AUTHOR
 
 DESCRIPTION
         
-    Creates a basic Heatmap from a Snippy core.aln or core.full.aln file.
+    Creates a basic Heatmap from a Snippy (created by Torsten Seemann and available at 
+    https://github.com/tseemann/snippy) core.aln or core.full.aln file.
     
     Each nucleotide site is colored according to the reference sequence.
     Sites with the same nucleotide as the reference are colored in gray and
@@ -27,10 +28,16 @@ DESCRIPTION
 
 
 import argparse
+import itertools
 
 import plotly.offline
 from Bio import SeqIO
 from Bio.Alphabet import generic_dna
+
+
+#snippy_aln_file = '/home/rfm/Desktop/rfm/Lab_Analyses/GBS_all_samples_reads/GBSAC13832_1_ref/core.full.aln'
+#reference_id = 'gbs'
+#plot_filename = 'gbs'
 
 
 def snippy_heatmap(snippy_aln_file, reference_id, plot_filename):
@@ -82,28 +89,88 @@ def snippy_heatmap(snippy_aln_file, reference_id, plot_filename):
     # process SNP data to get tracers for heatmap
     yaxis_labels = []
     snp_tracers_data = []
-
+    snp_hoverinfo = []
+    
+    # dictionary to change each sequence character to an integer
+    differences_mapping = {'A':1, 'T':1, 'G':1, 'C':1,
+                           'a':1, 't':1, 'g':1, 'c':1, 
+                           '-':2, 'N':3, 'X':3, 'n':3}
+    
+    color_range = []
     for assembly, snp_profile in assemblies_profiles.items():
         
+        # sample identifier for yaxis labels
         yaxis_labels.append(assembly)
-        reference_based = ['0' if snp_profile[i] == assemblies_profiles[reference][i] \
-                           else '1' for i in range(len(assemblies_profiles[reference]))]
         
+        # sample integer vectors, new list has an integer for each character in the original sequence
+        reference_based = [0 if snp_profile[i] == assemblies_profiles[reference][i] \
+                           else differences_mapping[snp_profile[i]] for i in range(len(assemblies_profiles[reference]))]
         snp_tracers_data.append(reference_based)
+        
+        # append distinct integers to know which type of chars are present in the alignment
+        color_range.append(list(set(reference_based)))
+        
+        # create hovertext to display nucleotides or special characters while hovering over plot
+        sample_hovertext = [snp_profile[i] if snp_profile[i] == assemblies_profiles[reference][i] \
+                            else '{0} ({1})'.format(snp_profile[i], assemblies_profiles[reference][i]) for i in range(len(snp_profile))]
+        snp_hoverinfo.append(sample_hovertext)
+
 
     print('Generating Heatmap tracer...')
+    
+    # colors for each type of char
+    colors = {0: '#ece7f2', 1: '#41ab5d',
+              2: '#0868ac', 3: '#252525'}
+    
+    # flatten and keep distinct group of integers
+    color_range = list(set(list(itertools.chain.from_iterable(color_range))))
+    # sort integers list
+    color_range.sort()
+    
+    # find max integer and determine the number of levels for the colorscale
+    max_val = max(color_range)
+    normalized_color_range = [c/max_val for c in color_range]
+    
+    # create colorscale
+    colorscale = []
+    for i in range(len(color_range)):
+        colorscale.append([normalized_color_range[i], colors[color_range[i]]])
 
     # create Heatmap tracer
     # created as normal Python dictionary for speed
     # go.Heatmap takes a long time with large arrays
-    snp_heatmap_trace = dict(y = yaxis_labels,
-                             z = snp_tracers_data,
-                             colorscale = [[0, 'rgb(224, 224, 224)'],
-                                           [1, 'rgb(51,153,255)']],
+    snp_heatmap_trace = dict(z = snp_tracers_data,
+                             colorscale = colorscale,
+                             y = yaxis_labels,
                              showscale = False,
-                             type = 'heatmap')
+                             type = 'heatmap',
+                             # creating hovertext with 'x', 'y' and 'z' info can
+                             # lead to a big html file
+                             hoverinfo= 'x+y+text',
+                             text = snp_hoverinfo,
+                             # add gap between each sample row
+                             ygap =	3)
     
     snp_heatmap_data = [snp_heatmap_trace]
+    
+    # integer to feature mapping
+    feature_mapping = {0: 'Equal', 1: 'SNP',
+                       2: 'Zero coverage or deletion (-)', 
+                       3: 'Low coverage (N)<br>Masked region on reference (X)<br>Heterozygous or poor quality genotype (n)'}
+    
+    # create ghost tracer to have custom legend
+    # create a tracer without data but with a legend to show the meanign of each
+    # heatmap color
+    for f in range(len(color_range)):
+        snp_ghost_trace = dict(x = [None],
+                               y = [None],
+                               mode = 'markers',
+                               marker = dict(size=10, color=colors[color_range[f]], symbol = 'square',
+                                             line = dict(color = '#000000', width = 1)),
+                               showlegend = True,
+                               name = feature_mapping[color_range[f]])
+    
+        snp_heatmap_data.append(snp_ghost_trace)
     
     snp_heatmap_layout = dict(title = '{0} Heatmap'.format(reference),
                               xaxis = dict(title = 'Nucleotide Position'),
@@ -117,8 +184,7 @@ def snippy_heatmap(snippy_aln_file, reference_id, plot_filename):
     # create Fig, also as a Python dictionary for speed
     snp_heatmap_fig = dict(data = snp_heatmap_data, layout = snp_heatmap_layout)
     # plot the Heatmap, no validation to be faster
-    plotly.offline.plot(snp_heatmap_fig, filename = output_plot_file, auto_open = False, 
-                        validate=False)
+    plotly.offline.plot(snp_heatmap_fig, filename = output_plot_file, auto_open = False, validate=False)
 
     print('Done!\n')
 
