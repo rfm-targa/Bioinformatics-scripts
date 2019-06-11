@@ -89,7 +89,7 @@ def create_heatmap_tracer(y_data, z_data, text, colorscale='Viridis', showscale=
 def legend_ghost_tracer(tracer_name, x_data=[None], y_data=[None], tracer_mode='markers', 
                         marker_size=10, marker_color='#000000', marker_symbol='square', 
                         marker_line_color='#000000', marker_line_width=1):
-    """ Creates a tracer for a heatmap plot.
+    """ Creates a tracer without data to only show a custom legend.
         
         Args: 
             tracer_name (str): name displayed in the legend;
