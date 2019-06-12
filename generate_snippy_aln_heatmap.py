@@ -29,12 +29,10 @@ DESCRIPTION
         * legend_ghost_tracer - creates a tracer with no data but that displays a
                                 marker for a custom legend;
         * figure_layout - creates the layout for the plot figure;
-        * snippy_heatmap - creates a Heatmap plot from a Snippy .aln file to 
-                           highlight sequence differences between a reference 
-                           and other samples;
-        * main - the main function of the script, used to parse arguments from 
-          the command line and call the snippy_heatmap function.
-    
+        * main - creates a Heatmap plot from a Snippy .aln file to highlight 
+                 sequence differences between a reference and other samples;
+        * parse_arguments - function to parse arguments provided through the CMD.
+
     Note: the output file size will vary according to the number of samples. When using 
     a core.full.aln file, the output HTML file might be large depending on the number of samples.
     e.g: a core.full.aln file with the alignment between the assembly of 1 reference and 7 samples
@@ -141,7 +139,7 @@ def figure_layout(plot_title, xaxis_title, yaxis_title):
     return layout
 
 
-def snippy_heatmap(snippy_aln_file, reference_id, plot_filename):
+def main(snippy_aln_file, reference_id, plot_filename):
     """ Creates a Plotly Heatmap based on sequence differences present in the 
         Snippy .aln files, either the core.aln with concatenated SNPs or the 
         core.full.aln file with full assembly/genome multi-alignment.
@@ -272,28 +270,30 @@ def snippy_heatmap(snippy_aln_file, reference_id, plot_filename):
     print('Done!\n')
 
 
-def main():
+def parse_arguments():
     
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     
-    parser.add_argument('snippy_aln_file', type=str, 
+    parser.add_argument('-i', '--input', type=str, required=True, dest='snippy_aln_file',
                         help='Path to the Snippy multi-fasta alignment file.'
                              ' Either the core.aln with concatenated SNPs or'
                              ' the core.full.aln with the full alignment.')
     
-    parser.add_argument('reference_id', type=str,
-                       help='User-defined identifier string for the reference sample.')
+    parser.add_argument('-rid','--reference_id', type=str, required=True, dest='reference_id',
+                        help='User-defined identifier string for the reference sample.')
     
-    parser.add_argument('plot_filename', type=str,
+    parser.add_argument('-pf', '--plot_filename', type=str, required=True, dest='plot_filename',
                         help='Name for the output HTML file with the heatmap'
                              ' (.html extension will be added to end of filename).')
     
     args = parser.parse_args()
-    snippy_heatmap(args.snippy_aln_file, args.reference_id, args.plot_filename)
     
+    return [args.snippy_aln_file, args.reference_id, args.plot_filename]
+
 
 if __name__ == '__main__':
     
-    main()
+    args = parse_arguments()
+    main(args[0], args[1], args[2])
 
