@@ -15,7 +15,7 @@ DESCRIPTION
     the mean coverage depth for each extracted interval.
     
     This script is written in Python 3 and does not require the installation 
-    of any additional Python packages. 
+    of additional Python packages. 
     
     The main function can be imported to another script and called with the 
     same arguments to obtain the same results as when this script is called 
@@ -47,25 +47,25 @@ def main(bam_file, output_directory, sample_interval):
     """
 
     if not os.path.isfile(bam_file):
-        raise Exception('Input file does not exist or cannot be found in given path. '
+        raise Exception('\nInput file does not exist or cannot be found in given path. '
                         'Please provide a valid path to a BAM file.')
 
     if not os.path.exists(output_directory):
         os.mkdir(output_directory)
     else:
-        print('\nOutput directory already exists. Moving on...\n')
+        print('\nOutput directory already exists. Moving on...')
 
     # run SAMtools depth command to compute coverage depth at each nucleotide position
-    print('Using SAMtools to compute coverage depth at each nucleotide position...\n')
+    print('\nUsing SAMtools to compute coverage depth at each nucleotide position...\n')
     depth_file = '{0}{1}'.format(os.path.basename(bam_file).split('.')[0], '.depth')
     depth_file_path = os.path.join(output_directory, depth_file)
     samtools_depth_cmd = 'samtools depth -aa {0} > {1}'.format(bam_file, depth_file_path)
     os.system(samtools_depth_cmd)
     
-    print('Importing coverage depth info and determining mean coverage depth for all possible intervals...\n')
+    print('Importing coverage depth info and determining mean coverage depth for all intervals...\n')
     
     # read file with coverage depth for each nucleotide position
-    with open(depth_file, 'r') as cov:
+    with open(depth_file_path, 'r') as cov:
         bases_coverage = cov.readlines()
         bases_coverage = [line.strip().split('\t') for line in bases_coverage]
         
