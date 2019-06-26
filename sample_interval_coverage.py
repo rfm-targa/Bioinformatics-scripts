@@ -15,7 +15,7 @@ DESCRIPTION
     the mean coverage depth for each extracted interval.
     
     This script is written in Python 3 and does not require the installation 
-    of any additional packages. 
+    of any additional Python packages. 
     
     The main function can be imported to another script and called with the 
     same arguments to obtain the same results as when this script is called 
