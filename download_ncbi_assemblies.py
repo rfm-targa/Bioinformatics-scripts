@@ -8,6 +8,11 @@ AUTHOR
 
 DESCRIPTION
 
+    This script accepts a Genome Assembly and Annotation report
+    table from the NCBI and downloads the genomes/assemblies of
+    the samples listed in the table. If the genomes/assemblies
+    are not in the refseq FTP, it tries to download from Genbank.
+    After failing a download, the script keeps trying up to 7 times.
 """
 
 
@@ -24,7 +29,17 @@ socket.setdefaulttimeout(30)
 
 
 def download_assembly(url, file_name):
-    """
+    """ Accepts a url to download a file, retrying up to 7 times
+        if previous attempts are not successful.
+
+        Args:
+            url (str): an url to download a file.
+            file_name (str): the identifier of the file to be downloaded.
+
+        Returns:
+            response: a string indicating that the download failed or
+            an object with the response information for the successful
+            download.
     """
 
     tries = 0
@@ -42,8 +57,6 @@ def download_assembly(url, file_name):
 
 
 def main(input_table, output_directory):
-    """
-    """
 
     if not os.path.isdir(output_directory):
         os.mkdir(output_directory)
