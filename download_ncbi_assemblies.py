@@ -52,14 +52,22 @@ def main(input_table, output_directory):
     with open(input_table, 'r') as table:
         lines = list(csv.reader(table, delimiter='\t'))
 
-    urls = [line[17] for line in lines[1:] if line[17] != '-']
-    assemblies_ids = [url.split('/')[-1] for url in urls]
+    # get urls for samples that have refseq ftp path
+    refseq_urls = [line[17] for line in lines[1:] if line[17] != '-']
+    refseq_assemblies_ids = [url.split('/')[-1] for url in refseq_urls]
+
+    # try to get genbank urls for samples that had no refseq ftp path
+    genbank_urls = [line[18] for line in lines[1:] if line[17] == '-' and line[18] != '-']
+    genbank_assemblies_ids = [url.split('/')[-1] for url in genbank_urls]
+
+    urls = refseq_urls + genbank_urls
+    assemblies_ids = refseq_assemblies_ids + genbank_assemblies_ids
 
     ftp_urls = []
     for url in range(len(urls)):
         ftp_url = '{0}/{1}_genomic.fna.gz'.format(urls[url], assemblies_ids[url])
         ftp_urls.append(ftp_url)
-        
+
     files_number = len(ftp_urls)
 
     assemblies_ids = ['{0}.fasta.gz'.format(url) for url in assemblies_ids]
