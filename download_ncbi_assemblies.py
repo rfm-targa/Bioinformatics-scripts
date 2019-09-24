@@ -57,7 +57,7 @@ def download_assembly(url, file_name):
     return response
 
 
-def main(input_table, ftp_path_list , output_directory):
+def main(input_table, ftp_path_list, output_directory):
 
     if not os.path.isdir(output_directory):
         os.mkdir(output_directory)
