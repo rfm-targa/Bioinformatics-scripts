@@ -18,6 +18,7 @@ DESCRIPTION
 
 import os
 import csv
+import sys
 import time
 import socket
 import argparse
@@ -56,73 +57,114 @@ def download_assembly(url, file_name):
     return response
 
 
-def main(input_table, output_directory):
+def main(input_table, ftp_path_list , output_directory):
 
     if not os.path.isdir(output_directory):
         os.mkdir(output_directory)
+        
+    if not input_table and not ftp_path_list:
+        print()
+        sys.tracebacklimit=0
+        raise Exception("Please provide an NCBI Genome Assembly and Annotation report "
+                        "or a file containing a list of FTP paths.")
+        
+    if ftp_path_list:
+        # open file containing a list of ftp paths
+        with open(ftp_path_list, "r") as ftp_paths:
+            list_ftp_paths = ftp_paths.readlines()
+            
+        
+        ftp_ids = [os.path.join(output_directory, ids.strip().split("/")[-1]) for ids in list_ftp_paths]
+        
+        files_number = len(list_ftp_paths)
+        
+        print('\nStarting download of {0} fasta.gz files...'.format(len(ftp_path_list)))
+        start = time.time()
+    
+        # We can use a with statement to ensure threads are cleaned up promptly
+        failures = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=30) as executor:
+            # Start the load operations and mark each future with its URL
+            for res in executor.map(download_assembly, ftp_path_list, ftp_ids):
+                failures.append(res)
+    
+        failures_number = len([res for res in failures if 'Failed' in res])
+    
+        end = time.time()
+        delta = end - start
+        minutes = int(delta/60)
+        seconds = delta % 60
+        print('Finished downloading {0}/{1} fasta.gz files.\nElapsed Time: {2}m{3:.0f}s'.format(files_number-failures_number, files_number,
+                                                                                                minutes, seconds))
+    
+    elif input_table:
 
-    # open table downloaded from NCBI
-    with open(input_table, 'r') as table:
-        lines = list(csv.reader(table, delimiter='\t'))
-
-    # get urls for samples that have refseq ftp path
-    refseq_urls = [line[17] for line in lines[1:] if line[17] != '-']
-    refseq_assemblies_ids = [url.split('/')[-1] for url in refseq_urls]
-
-    # try to get genbank urls for samples that had no refseq ftp path
-    genbank_urls = [line[18] for line in lines[1:] if line[17] == '-' and line[18] != '-']
-    genbank_assemblies_ids = [url.split('/')[-1] for url in genbank_urls]
-
-    urls = refseq_urls + genbank_urls
-    assemblies_ids = refseq_assemblies_ids + genbank_assemblies_ids
-
-    ftp_urls = []
-    for url in range(len(urls)):
-        ftp_url = '{0}/{1}_genomic.fna.gz'.format(urls[url], assemblies_ids[url])
-        ftp_urls.append(ftp_url)
-
-    files_number = len(ftp_urls)
-
-    assemblies_ids = ['{0}.fasta.gz'.format(url) for url in assemblies_ids]
-    assemblies_ids = [os.path.join(output_directory, file_name) for file_name in assemblies_ids]
-
-    print('\nStarting download of {0} fasta.gz files...'.format(len(ftp_urls)))
-    start = time.time()
-
-    # We can use a with statement to ensure threads are cleaned up promptly
-    failures = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=30) as executor:
-        # Start the load operations and mark each future with its URL
-        for res in executor.map(download_assembly, ftp_urls, assemblies_ids):
-            failures.append(res)
-
-    failures_number = len([res for res in failures if 'Failed' in res])
-
-    end = time.time()
-    delta = end - start
-    minutes = int(delta/60)
-    seconds = delta % 60
-    print('Finished downloading {0}/{1} fasta.gz files.\nElapsed Time: {2}m{3:.0f}s'.format(files_number-failures_number, files_number,
-                                                                                            minutes, seconds))
-
+        # open table downloaded from NCBI
+        with open(input_table, 'r') as table:
+            lines = list(csv.reader(table, delimiter='\t'))
+    
+        # get urls for samples that have refseq ftp path
+        refseq_urls = [line[17] for line in lines[1:] if line[17] != '-']
+        refseq_assemblies_ids = [url.split('/')[-1] for url in refseq_urls]
+    
+        # try to get genbank urls for samples that had no refseq ftp path
+        genbank_urls = [line[18] for line in lines[1:] if line[17] == '-' and line[18] != '-']
+        genbank_assemblies_ids = [url.split('/')[-1] for url in genbank_urls]
+    
+        urls = refseq_urls + genbank_urls
+        assemblies_ids = refseq_assemblies_ids + genbank_assemblies_ids
+    
+        ftp_urls = []
+        for url in range(len(urls)):
+            ftp_url = '{0}/{1}_genomic.fna.gz'.format(urls[url], assemblies_ids[url])
+            ftp_urls.append(ftp_url)
+    
+        files_number = len(ftp_urls)
+    
+        assemblies_ids = ['{0}.fasta.gz'.format(url) for url in assemblies_ids]
+        assemblies_ids = [os.path.join(output_directory, file_name) for file_name in assemblies_ids]
+    
+        print('\nStarting download of {0} fasta.gz files...'.format(len(ftp_urls)))
+        start = time.time()
+    
+        # We can use a with statement to ensure threads are cleaned up promptly
+        failures = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=30) as executor:
+            # Start the load operations and mark each future with its URL
+            for res in executor.map(download_assembly, ftp_urls, assemblies_ids):
+                failures.append(res)
+    
+        failures_number = len([res for res in failures if 'Failed' in res])
+    
+        end = time.time()
+        delta = end - start
+        minutes = int(delta/60)
+        seconds = delta % 60
+        print('Finished downloading {0}/{1} fasta.gz files.\nElapsed Time: {2}m{3:.0f}s'.format(files_number-failures_number, files_number,
+                                                                                                minutes, seconds))
+        
+    
 
 def parse_arguments():
 
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
 
-    parser.add_argument('-t', '--input_table', type=str, required=True, dest='input_table',
+    parser.add_argument('-t', '--input_table', type=str, required=False, dest='input_table',
                         help='TSV file downloaded from the NCBI Genome Assembly and Annotation report.')
+    
+    parser.add_argument('-l', '--ftp_path_list', type=str, required=False, dest='ftp_path_list',
+                        help='File containing a list of FTP paths.')
 
     parser.add_argument('-o', '--output_directory', type=str, required=True, dest='output_directory',
                         help='Path to the directory where downloaded files will be stored.')
 
     args = parser.parse_args()
 
-    return [args.input_table, args.output_directory]
+    return [args.input_table, args.ftp_path_list, args.output_directory]
 
 
 if __name__ == '__main__':
 
     args = parse_arguments()
-    main(args[0], args[1])
+    main(args[0], args[1], args[2])
