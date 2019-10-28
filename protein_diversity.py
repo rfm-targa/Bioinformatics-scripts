@@ -200,7 +200,13 @@ def plot_diversity(data, title, output_dir):
                             y=y_proteins, marker_color='rgb(127,201,127)')
 
     fig = go.Figure(data=[alleles_tracer, protein_tracer])
-    fig.update_layout(barmode='group', title_text=title)
+
+    complete_title = '{0}<br>Distinct alleles vs distinct proteins'.format(title)
+    fig.update_layout(barmode='group', title_text=complete_title)
+
+    fig.update_xaxes(title_text='Gene identifier')
+    fig.update_yaxes(title_text='Number of distinct alleles<br>& '
+                    'Number of distinct proteins')
 
     output_file = os.path.join(output_dir, '{0}.html'.format(title))
 
