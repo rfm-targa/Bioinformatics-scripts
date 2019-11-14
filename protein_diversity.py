@@ -63,7 +63,10 @@ def group_by_protein(fasta_file):
         seqid = record.id
         allele_id = seqid.split('_')[-1]
         sequence = str(record.seq)
-        protein = Seq.translate(sequence, table=11, cds=True)
+        try:
+            protein = Seq.translate(sequence, table=11, cds=True)
+        except Exception:
+            continue
 
         if protein in protein_diversity[basename]:
             protein_diversity[basename][protein][0].append((allele_id, sequence))
