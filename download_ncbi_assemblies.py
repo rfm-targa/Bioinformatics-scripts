@@ -93,7 +93,7 @@ def main(input_table, output_directory):
 
     # We can use a with statement to ensure threads are cleaned up promptly
     failures = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=30) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
         # Start the load operations and mark each future with its URL
         for res in executor.map(download_assembly, ftp_urls, assemblies_ids):
             failures.append(res)
