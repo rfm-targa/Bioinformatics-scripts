@@ -66,11 +66,11 @@ def main(input_table, output_directory):
         lines = list(csv.reader(table, delimiter=','))
 
     # get urls for samples that have refseq ftp path
-    refseq_urls = [line[15] for line in lines[1:] if line[15] != '-']
+    refseq_urls = [line[15] for line in lines[1:] if line[15].strip() != '']
     refseq_assemblies_ids = [url.split('/')[-1] for url in refseq_urls]
 
     # try to get genbank urls for samples that had no refseq ftp path
-    genbank_urls = [line[16] for line in lines[1:] if line[15] == '-' and line[17] != '-']
+    genbank_urls = [line[14] for line in lines[1:] if line[15].strip() == '' and line[14].strip() != '']
     genbank_assemblies_ids = [url.split('/')[-1] for url in genbank_urls]
 
     urls = refseq_urls + genbank_urls
@@ -93,10 +93,13 @@ def main(input_table, output_directory):
 
     # We can use a with statement to ensure threads are cleaned up promptly
     failures = []
+    success = 0
     with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
         # Start the load operations and mark each future with its URL
         for res in executor.map(download_assembly, ftp_urls, assemblies_ids):
             failures.append(res)
+            success += 1
+            print('\r', 'Downloaded {0}'.format(success), end='')
 
     failures_number = len([res for res in failures if 'Failed' in res])
 
@@ -104,7 +107,7 @@ def main(input_table, output_directory):
     delta = end - start
     minutes = int(delta/60)
     seconds = delta % 60
-    print('Finished downloading {0}/{1} fasta.gz files.'
+    print('\nFinished downloading {0}/{1} fasta.gz files.'
           '\nElapsed Time: {2}m{3:.0f}s'
           ''.format(files_number-failures_number,
                     files_number, minutes, seconds))
