@@ -56,7 +56,7 @@ def download_assembly(url, file_name):
     return response
 
 
-def main(input_table, output_directory):
+def main(input_table, output_directory, file_extension):
 
     if not os.path.isdir(output_directory):
         os.mkdir(output_directory)
@@ -78,8 +78,8 @@ def main(input_table, output_directory):
 
     ftp_urls = []
     for url in range(len(urls)):
-        ftp_url = '{0}/{1}_genomic.fna.gz'.format(urls[url],
-                                                  assemblies_ids[url])
+        ftp_url = '{0}/{1}_{2}'.format(urls[url],
+            assemblies_ids[url], file_extension)
         ftp_urls.append(ftp_url)
 
     files_number = len(ftp_urls)
@@ -128,12 +128,17 @@ def parse_arguments():
                         help='Path to the directory where downloaded '
                              'files will be stored.')
 
+    parser.add_argument('--fe', '--file_extension', type=str,
+                        required=False, default='genomic.fna.gz',
+                        dest='file_extension',
+                        help='')
+
     args = parser.parse_args()
 
-    return [args.input_table, args.output_directory]
+    return [args.input_table, args.output_directory, args.file_extension]
 
 
 if __name__ == '__main__':
 
     args = parse_arguments()
-    main(args[0], args[1])
+    main(args[0], args[1], args[2])
