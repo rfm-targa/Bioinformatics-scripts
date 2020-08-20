@@ -17,6 +17,7 @@ DESCRIPTION
 
 
 import os
+import sys
 import csv
 import time
 import socket
@@ -56,7 +57,7 @@ def download_assembly(url, file_name):
     return response
 
 
-def main(input_table, output_directory, file_extension):
+def main(input_table, output_directory, file_extension, ftp):
 
     if not os.path.isdir(output_directory):
         os.mkdir(output_directory)
@@ -66,12 +67,19 @@ def main(input_table, output_directory, file_extension):
         lines = list(csv.reader(table, delimiter=','))
 
     # get urls for samples that have refseq ftp path
-    refseq_urls = [line[15] for line in lines[1:] if line[15].strip() != '']
-    refseq_assemblies_ids = [url.split('/')[-1] for url in refseq_urls]
+    refseq_urls = []
+    refseq_assemblies_ids = []
+    if 'refseq' in ftp:
+        refseq_urls = [line[15] for line in lines[1:] if line[15].strip() != '']
+        refseq_assemblies_ids = [url.split('/')[-1] for url in refseq_urls]
 
-    # try to get genbank urls for samples that had no refseq ftp path
-    genbank_urls = [line[14] for line in lines[1:] if line[15].strip() == '' and line[14].strip() != '']
-    genbank_assemblies_ids = [url.split('/')[-1] for url in genbank_urls]
+    genbank_urls = []
+    genbank_assemblies_ids = []
+    if 'genbank' in ftp:
+        # get genbank urls
+        # only get if sample is not in refseq list
+        genbank_urls = [line[14] for line in lines[1:] if line[14].strip() != '' and line[15] not in refseq_urls]
+        genbank_assemblies_ids = [url.split('/')[-1] for url in genbank_urls]
 
     urls = refseq_urls + genbank_urls
     assemblies_ids = refseq_assemblies_ids + genbank_assemblies_ids
@@ -83,6 +91,8 @@ def main(input_table, output_directory, file_extension):
         ftp_urls.append(ftp_url)
 
     files_number = len(ftp_urls)
+    if files_number == 0:
+        sys.exit('No valid ftp links after scanning table.')
 
     assemblies_ids = ['{0}.fasta.gz'.format(url) for url in assemblies_ids]
     assemblies_ids = [os.path.join(output_directory, file_name)
@@ -131,14 +141,21 @@ def parse_arguments():
     parser.add_argument('--fe', '--file_extension', type=str,
                         required=False, default='genomic.fna.gz',
                         dest='file_extension',
+                        help='Choose file type to download through extension. '
+                             '')
+
+    parser.add_argument('--ftp', type=str,
+                        required=False, choices=['refseq+genbank', 'refseq', 'genbank'],
+                        default='refseq+genbank',
+                        dest='ftp',
                         help='')
 
     args = parser.parse_args()
 
-    return [args.input_table, args.output_directory, args.file_extension]
+    return [args.input_table, args.output_directory, args.file_extension, args.ftp]
 
 
 if __name__ == '__main__':
 
     args = parse_arguments()
-    main(args[0], args[1], args[2])
+    main(args[0], args[1], args[2], args[3])
