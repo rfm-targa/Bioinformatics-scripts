@@ -146,7 +146,7 @@ def main(input_fasta, depth_data, output_fasta, cutoff, mask_gaps):
         # positions on trimmed regions
         zero_cov = [z for z in zero_cov
                     if int(z[1]) > left_pos
-                    and int(z[1]) < right_pos]
+                    and int(z[1]) <= right_pos]
 
         total = len(zero_cov)
         print('\nFound a total of {0} positions with '
