@@ -70,6 +70,13 @@ def import_seqs(fasta_file):
     return seqs
 
 
+input_fasta = '/home/rfm/Desktop/rfm/Lab_Analyses/msa_masker_bug/input_example.fasta'
+depth_data = '/home/rfm/Desktop/rfm/Lab_Analyses/msa_masker_bug/depth_unzipped'
+output_fasta = '/home/rfm/Desktop/rfm/Lab_Analyses/msa_masker_bug/output_example.fasta'
+cutoff = 9
+mask_gaps = False
+
+
 def main(input_fasta, depth_data, output_fasta, cutoff, mask_gaps):
 
     start_date = dt.datetime.now()
