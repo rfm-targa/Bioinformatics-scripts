@@ -1,33 +1,28 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-AUTHOR
+Purpose
+-------
+Given an input schema, and for each gene file, translates DNA
+sequences of all alleles in each locus and determines 
+which alleles code for the excat same protein sequence.
 
-    Rafael Mamede
-    github: @rfm-targa
+This script outputs new schema files with sequences ordered by 
+descending length and with a new dot notation before the allele
+identifier. The first algarism is the protein identifier for which
+that allele codes and the second algarism is the number of the 
+allele that codes for that protein. The notation '2.3' indicates
+that the allele codes for the second protein listed for the gene
+and that it is the third allele that codes for that protein.
 
-DESCRIPTION
+>gene_id*2 (protein sequence header, the '*' separates the gene
+            identifier and the integer identifier given to the
+            protein sequence to highlight that it was the second
+            distinct protein listed for that gene.)
 
-    Given an input schema, and for each gene file, translates DNA
-    sequences of all alleles in each locus and determines 
-    which alleles code for the excat same protein sequence.
-    
-    This script outputs new schema files with sequences ordered by 
-    descending length and with a new dot notation before the allele
-    identifier. The first algarism is the protein identifier for which
-    that allele codes and the second algarism is the number of the 
-    allele that codes for that protein. The notation '2.3' indicates
-    that the allele codes for the second protein listed for the gene
-    and that it is the third allele that codes for that protein.
-    
-    >gene_id*2 (protein sequence header, the '*' separates the gene
-                identifier and the integer identifier given to the
-                protein sequence to highlight that it was the second
-                distinct protein listed for that gene.)
-    
-    >gene_id*2.3_9 (dna/allele sequence header, the '*' separates the
-                    gene identifier from the dot notation and the header
-                    ends with the original allele identifier.)
+>gene_id*2.3_9 (dna/allele sequence header, the '*' separates the
+                gene identifier from the dot notation and the header
+                ends with the original allele identifier.)
 """
 
 
@@ -41,24 +36,27 @@ from plotly.offline import plot
 
 
 def group_by_protein(fasta_file):
-    """ Groups DNA sequences based on the protein they code for.
+    """ Groups DNA sequences based on the protein
+        they code for.
 
-        Args:
-            fasta_file (str): path to the FASTA file with DNA
-            sequences for a gene.
+        Parameters
+        ----------
+        fasta_file : str
+            Path to the FASTA file with DNA sequences
+            for a gene.
 
-        Returns:
-            protein_diversity (dict): dictionary with a gene
-            identifier as key and another dictionary as value.
-            The nested dictionary has protein sequences as keys
-            and a list as value for each key. Each list has
-            the allele identifiers and sequences that code for
-            that protein, organized in tuples.
+        Returns
+        -------
+        protein_diversity : dict
+            Dictionary with a gene identifier as key
+            and another dictionary as value. The nested
+            dictionary has protein sequences as keys
+            and a list as value for each key. Each list
+            has the allele identifiers and sequences
+            that code for that protein, organized in tuples.
     """
 
     protein_diversity = {}
-    basename = os.path.basename(fasta_file)
-    protein_diversity[basename] = {}
     for record in SeqIO.parse(fasta_file, 'fasta'):
         seqid = record.id
         allele_id = seqid.split('_')[-1]
@@ -68,107 +66,147 @@ def group_by_protein(fasta_file):
         except Exception:
             continue
 
-        if protein in protein_diversity[basename]:
-            protein_diversity[basename][protein][0].append((allele_id, sequence))
-        else:
-            protein_diversity[basename][protein] = [[(allele_id, sequence)]]
+        protein_diversity.setdefault(protein, []).append((allele_id, sequence))
 
     return protein_diversity
 
 
-def write_files(gene_proteins, output_dir):
-    """ Writes a FASTA file with the allele sequences for a gene,
-        including dot notation in the sequence headers. Also writes
-        a FASTA file with all distinct proteins for that gene.
+def attribute_ids(gene_proteins, output_dir, gene_id):
+    """ Writes a FASTA file with the allele sequences for
+        a gene, including dot notation in the sequence
+        headers. Also writes a FASTA file with all distinct
+        proteins for that gene.
 
-        Args:
-            gene_proteins (dict): dictionary with a gene
-            identifier as key and another dictionary as value.
-            The nested dictionary has protein sequences as keys
-            and a list as value for each key. Each list has
-            the allele identifiers and sequences that code for
-            that protein, organized in tuples.
-            output_dir (str): path to the output directory where
-            new files will be stored.
+        Parameters
+        ----------
+        gene_proteins : dict
+            Dictionary with a gene identifier as key and
+            another dictionary as value. The nested
+            dictionary has protein sequences as keys and
+            a list as value for each key. Each list has
+            the allele identifiers and sequences that code
+            for that protein, organized in tuples.
+        output_dir : str
+            Path to the output directory where new files
+            will be stored.
 
-        Returns:
-            A list with the following variables:
-                - the gene identifier;
-                - the number of distinct proteins for that gene;
-                - the number of distinct DNA sequences for that gene.
+        Returns
+        -------
+        A list with the following variables:
+            - the gene identifier;
+            - the number of distinct proteins for that gene;
+            - the number of distinct DNA sequences for that gene.
     """
 
-    for g, v in gene_proteins.items():
-        gene_id = g.split('_')[0]
-        # get proteins and sort by descending length
-        gene_prots = v
-        sorted_prots = sorted(list(gene_prots.keys()), key=len, reverse=True)
+    # get proteins and sort by descending length
+    gene_prots = gene_proteins
+    sorted_proteins = sorted(list(gene_prots.keys()), key=len,
+                             reverse=True)
 
-        protid = 1
+    protid = 1
+    alleleid = 1
+    locus_data = []
+    protein_counts = {}
+    protein_mapping = {}
+    dna_records = []
+    protein_records = []
+    for protein in sorted_proteins:
+        current_protein = gene_prots[protein]
+
+        alleles = [a[0] for a in current_protein]
+        total_alleles = len(alleles)
+        protein_counts[protid] = total_alleles
+        protein_mapping[protid] = alleles
+        sequences = [a[1] for a in current_protein]
+
+        protein_record = '>{0}*{1}\n{2}'.format(gene_id, protid, protein)
+        protein_records.append(protein_record)
+
+        for i, allele in enumerate(alleles):
+            dna_sequence = sequences[i]
+            dna_record = '>{0}*{1}.{2}_{3}\n{4}'.format(gene_id,
+                                                        protid,
+                                                        alleleid,
+                                                        allele,
+                                                        dna_sequence)
+
+            dna_records.append(dna_record)
+            alleleid += 1
+
         alleleid = 1
-        total_alleles = 0
-        dna_file = '{0}_{1}'.format('dna', g)
-        dna_file = os.path.join(output_dir, dna_file)
-        protein_file = '{0}_{1}'.format('protein', g)
-        protein_file = os.path.join(output_dir, protein_file)
-        for prot in sorted_prots:
-            current_prot = gene_prots[prot]
+        protid += 1
 
-            alleles = [a[0] for a in current_prot[0]]
-            total_alleles += len(alleles)
-            sequences = [a[1] for a in current_prot[0]]
+    return [protein_mapping, protein_counts,
+            protein_records, dna_records]
 
-            prot_header = '>{0}*{1}\n'.format(gene_id, protid)
-            with open(protein_file, 'a') as pfile:
-                prot_sequence = prot
-                prot_record = '{0}{1}\n'.format(prot_header,
-                                                prot_sequence)
-                pfile.write(prot_record)
 
-            with open(dna_file, 'a') as dfile:
-                for i, allele in enumerate(alleles):
-                    dna_header = '>{0}*{1}.{2}_{3}\n'.format(gene_id,
-                                                             protid,
-                                                             alleleid,
-                                                             allele)
-                    dna_sequence = sequences[i]
-                    dna_record = '{0}{1}\n'.format(dna_header,
-                                                   dna_sequence)
-                    dfile.write(dna_record)
-                    alleleid += 1
+def write_lines(lines, output_file):
+    """ Writes a list of lines toa  file.
+    
+        Parameters
+        ----------
+        lines : list
+            List with strings/lines.
+        
+        output_file : str
+            Path to the output file.
+    """
 
-            alleleid = 1
-            protid += 1
+    with open(output_file, 'w') as outfile:
+        outfile.write('\n'.join(lines)+'\n')
 
-    return [gene_id, len(sorted_prots), total_alleles]
+    return output_file
 
 
 def protein_diversity(file, output_dir):
-    """ Determines DNA sequences that code for the same protein
-        and writes new files with the DNA sequences and protein
-        sequences, including dot notation in the DNA sequences
-        headers to highlight the protein they code and if there
-        are more DNA sequences coding for the same  protein.
+    """ Determines DNA sequences that code for the same
+        protein and writes new files with the DNA sequences
+        and protein sequences, including dot notation in
+        the DNA sequences headers to highlight the protein
+        they code and if there are more DNA sequences
+        coding for the same  protein.
 
-        Args:
-            file (str): path a FASTA file with DNA sequences
-            for alleles of a single gene.
-            output_dir (str): output directory that will be used
-            to store the new files.
+        Parameters
+        ----------
+        file : str
+            Path a FASTA file with DNA sequences for alleles
+            of a single gene.
+        output_dir : str
+            Output directory that will be used to store the
+            new files.
 
-        Returns:
-            Writes a FASTA file with the DNA sequences for
-            a gene, including dot notation in the header and
-            a FASTA file with the distinct protein sequences
-            resulting from the translation of all DNA sequences,
-            ordered by descending length.
+        Returns
+        -------
+        Writes a FASTA file with the DNA sequences for
+        a gene, including dot notation in the header and
+        a FASTA file with the distinct protein sequences
+        resulting from the translation of all DNA sequences,
+        ordered by descending length.
     """
+
+    gene_id = os.path.basename(file).split('.fasta')[0]
 
     try:
         gene_proteins = group_by_protein(file)
-        res = write_files(gene_proteins, output_dir)
+        locus_data = attribute_ids(gene_proteins, output_dir, gene_id)
+        # write files with data
+        dna_file = '{0}/{1}_dna.fasta'.format(output_dir, gene_id)
+        write_lines(locus_data[3], dna_file)
+
+        protein_file = '{0}/{1}_protein.fasta'.format(output_dir, gene_id)
+        write_lines(locus_data[2], protein_file)
+
+        # write file with protein counts
+        protein_counts_file = '{0}/{1}_protein_counts.tsv'.format(output_dir, gene_id)
+        with open(protein_counts_file, 'a') as outfile:
+            lines = [(k, v) for k, v in locus_data[1].items()]
+            lines = sorted(lines, key= lambda x: x[1], reverse=True)
+            lines = ['protein_id\tallele_count'] + ['{0}\t{1}'.format(*l) for l in lines]
+            lines = '\n'.join(lines)
+            outfile.write(lines+'\n')
+
         print('Processed file: {0}'.format(file))
-        return res
+        return [gene_id, len(locus_data[2]), len(locus_data[3])]
     except Exception:
         print('Failed for file: {0}'.format(file))
 
@@ -178,19 +216,24 @@ def plot_diversity(data, title, output_dir):
         to visualize a Bar plot with the number of distinct
         proteins and distinct alleles per schema gene.
 
-        Args:
-            data (list): list with sublists. Each sublist has
+        Parameters
+        ----------
+        data : list
+            List with sublists. Each sublist has
             3 variables: gene identifier, number of distinct
             proteins and number of distinct alleles.
-            title (str): title for the Bar plot.
-            output_dir (str): output diretory where the HTML
-            file will be created.
+        title : str
+            Title for the Bar plot.
+        output_dir : str
+            Output diretory where the HTML file will
+            be created.
 
-        Returns:
-            Creates a HTML file that can be opened with
-            a Browser to visualize a plot comparing the
-            number of distinct alleles and the number of
-            distinct proteins for each gene.
+        Returns
+        -------
+        Creates a HTML file that can be opened with
+        a Browser to visualize a plot comparing the
+        number of distinct alleles and the number of
+        distinct proteins for each gene.
     """
 
     y_alleles = [d[2] for d in data]
@@ -221,47 +264,56 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
 
-    parser.add_argument('-i', type=str, required=True, dest='input_files',
+    parser.add_argument('-i', '--input-directory', type=str,
+                        required=True, dest='input_directory',
                         help='The chewBBACA schema directory.')
 
-    parser.add_argument('-o', type=str, required=True, dest='output_directory',
-                        help='Output directory that will be created to store'
-                        ' the new files.')
+    parser.add_argument('-o', '--output-directory', type=str,
+                        required=True, dest='output_directory',
+                        help='Output directory that will be created '
+                             'to store the new files.')
 
-    parser.add_argument('-t', type=int, required=False, dest='cpu_cores',
-                        default=1, help='Number of CPU cores to use.')
+    parser.add_argument('-t', '--threads', type=int,
+                        required=False, default=1, dest='threads',
+                        help='Number of CPU cores to use.')
 
-    parser.add_argument('-p', type=str, required=False, dest='create_plot',
-                        choices=['no', 'yes'], default='no', help='If the'
-                        ' process should create a Bar plot comparing the number'
-                        ' of alleles and the number of distinct proteins for each'
-                        ' gene.')
+    parser.add_argument('-p', '--plot-creation', type=str,
+                        action='store_true', dest='plot_creation',
+                        help='If the process should create a Bar plot '
+                             'comparing the number of alleles and the '
+                             'number of distinct proteins for each gene.')
 
     args = parser.parse_args()
 
-    return [args.input_files, args.output_directory, args.cpu_cores, args.create_plot]
+    return args
 
 
-def main(schema_dir, output_dir, cpu_cores, create_plot):
+def main(input_directory, output_directory, threads, plot_creation):
 
     # get list of schema files
-    schema_files = [os.path.join(schema_dir, file) for file in os.listdir(schema_dir) if '.fasta' in file]
-    schema_basename = os.path.basename(schema_dir) if schema_dir[-1] != '/' else os.path.basename(schema_dir[:-1])
+    schema_files = [os.path.join(input_directory, file)
+                    for file in os.listdir(input_directory)
+                    if '.fasta' in file]
+    schema_basename = os.path.basename(input_directory) \
+                      if input_directory[-1] != '/' \
+                      else os.path.basename(input_directory[:-1])
 
     # create directory to store new files
-    if not os.path.exists(output_dir):
-        os.mkdir(output_dir)
+    if not os.path.exists(output_directory):
+        os.mkdir(output_directory)
 
     # cluster alleles identifiers based on protein sequence
     plot_data = []
-    pool = multiprocessing.Pool(cpu_cores)
+    pool = multiprocessing.Pool(threads)
     for file in schema_files:
-        pool.apply_async(protein_diversity, (file, output_dir), callback=plot_data.append)
+        pool.apply_async(protein_diversity,
+                         (file, output_directory),
+                         callback=plot_data.append)
     pool.close()
     pool.join()
 
-    if create_plot == 'yes':
-        plot_diversity(plot_data, schema_basename, output_dir)
+    if plot_creation is True:
+        plot_diversity(plot_data, schema_basename, output_directory)
 
     print('Done!')
 
@@ -269,4 +321,4 @@ def main(schema_dir, output_dir, cpu_cores, create_plot):
 if __name__ == '__main__':
 
     args = parse_arguments()
-    main(args[0], args[1], args[2], args[3])
+    main(**vars(args))
