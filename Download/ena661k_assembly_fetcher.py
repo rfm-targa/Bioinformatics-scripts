@@ -1,195 +1,167 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+Purpose
+-------
+This script enables the download of genome assemblies from the
+ENA661k study ("Exploring bacterial diversity via a curated
+and searchable snapshot of archived DNA sequences").
 
-This script downloads genome assemblies from the
-ENA661k project (https://doi.org/10.1101/2021.03.02.433662).
-It can be used to download all genome assemblies for
-a species and the assemblies to download can be filtered
-based on a set of quality criteria.
-
+Code documentation
+------------------
 """
-
 
 import os
 import sys
 import csv
 import time
+import socket
+import hashlib
 import argparse
 import urllib.request
-from multiprocessing import TimeoutError
-from multiprocessing.pool import ThreadPool
+from zipfile import ZipFile
 
 
-# change csv module settings to read huge files
+# increase the field_size_limit
+# "File4_QC_characterisation_661k.txt" passed to this script has fields
+# that exceed field_size_limit (field: low_coverage_contigs)
 maxInt = sys.maxsize
 while True:
+    # this might lead to a OverflowError
+    # we need to decrease the value until it is accepted
     try:
         csv.field_size_limit(maxInt)
         break
     except OverflowError:
         maxInt = int(maxInt/10)
 
+# set socket timeout for urllib calls
+socket.setdefaulttimeout(60)
 
-# ftp path
+# EBI ftp path
 ebi_ftp = 'http://ftp.ebi.ac.uk'
+
+# URL to download "checklist.chk" file with md5 hashes
+url_hash_file = 'http://ftp.ebi.ac.uk/pub/databases/ENA2018-bacteria-661k/checklist.chk'
+
+
+# function passed to urllib.request.urlretrieve to track progress
+def HandleProgress(block_num, block_size, total_size):
+    read_data = 0
+    # calculating the progress
+    # storing a temporary value to store downloaded bytes so that we can
+    # add it later to the overall downloaded data
+    temp = block_num * block_size
+    read_data = temp + read_data
+    # calculating the remaining size
+    remaining_size = total_size - read_data
+    if (remaining_size <= 0):
+        downloaded_percentage = 100
+        remaining_size = 0
+    else:
+        downloaded_percentage = int(((total_size-remaining_size) / total_size)*(100))
+
+    if downloaded_percentage == 100:
+        print(f'Downloaded: {downloaded_percentage}% ', end="\n")
+    else:
+        print(" ", end="\r")
+        print(f'Downloaded: {downloaded_percentage}% ', end="\r")
+
+
+def checkDownload(file: str, file_hash: str, remove=False):
+    """Check the integrity of a downloaded file.
+
+    Parameters
+    ----------
+    file : str
+        Path to the file to check.
+    file_hash : str
+        Expected md5 hash for the file contents.
+
+    Returns
+    -------
+    True if the hash determined for the file contents matches
+    the expected hash, False otherwise.
+    """
+    with open(file, 'rb') as infile:
+        data = infile.read()
+        md5 = hashlib.md5(data).hexdigest()
+
+    if md5 != file_hash:
+        if remove is True:
+            os.remove(file)
+        return False
+
+    return True
 
 
 def read_table(file_path, delimiter='\t'):
-    """ Reads a tabular file.
+    """Read a tabular file.
 
-        Parameters
-        ----------
-        file_path : str
-            Path to the tabular file.
-        delimiter : str
-            Field delimiter.
+    Parameters
+    ----------
+    file_path : str
+        Path to the tabular file.
+    delimiter : str
+        Field delimiter.
 
-        Returns
-        -------
-        lines : list
-            List that contains one sublist per
-            line in the input tabular file.
+    Returns
+    -------
+    lines : list
+        List that contains one sublist per
+        line in the input tabular file.
     """
-
     with open(file_path, 'r') as infile:
         lines = list(csv.reader(infile, delimiter=delimiter))
 
     return lines
 
 
-def input_timeout(func, input_args, timeout):
-    """ Adds timeout feature to a function call.
+def download_ftp_file(file_url, out_file, original_hash, retry,
+                      verify=True, progress=False):
+    """Download a file from a FTP server.
 
-        Parameters
-        ----------
-        func
-            Function to call.
-        input_args : list
-            List with the ordered arguments to pass
-            to the function.
-        timeout : int
-            Maximum number of seconds that the process will
-            wait for a result.
+    Parameter
+    ---------
+    file_url : str
+        FTP path to the file to download.
+    out_file : str
+        Local path to the file that will be downloaded.
+    retry : int
+        Maximum number of retries if download fails.
+    original_hash : str
 
-        Returns
-        -------
-
-        Raises
-        ------
-        SystemExit
-            - If there is no return value from the function
-              call in the defined timeout.
+    Returns
+    -------
+    downloaded : bool
+        True if file was successfully downloaded, False otherwise.
     """
-
-    pool = ThreadPool(processes=1)
-    answer = pool.apply_async(func, args=[*input_args])
-
-    try:
-        return answer.get(timeout=timeout)
-    except TimeoutError as e:
-        sys.exit('Timed out.')
-
-
-def download_ftp_file(file_url, out_file, minimum_file_size, timeout):
-    """ Downloads a file from a FTP server.
-
-        Parameter
-        ---------
-        file_url : str
-            FTP path to the file to download.
-        out_file : str
-            Local path to the file that will be downloaded.
-
-        Returns
-        -------
-        downloaded : bool
-            True if the file was successfully downloaded,
-            False otherwise.
-    """
-
     tries = 0
     downloaded = False
-    while tries <= 5 and downloaded is False:
+    while downloaded is False and tries < retry:
         try:
-            res = input_timeout(urllib.request.urlretrieve,
-                                [file_url, out_file],
-                                timeout=timeout)
-            file_size = os.path.getsize(out_file)
-            if file_size < minimum_file_size:
-                os.remove(out_file)
-                raise ValueError
+            if progress is False:
+                res = urllib.request.urlretrieve(file_url, out_file)
+            else:
+                res = urllib.request.urlretrieve(file_url, out_file, HandleProgress)
+        except:
+            time.sleep(1)
+        tries += 1
+
+        if os.path.isfile(out_file) is True:
+            if verify is True:
+                if checkDownload(out_file, original_hash, True):
+                    downloaded = True
             else:
                 downloaded = True
-        except:
-            if os.path.isfile(out_file) is True:
-                os.remove(out_file)
-            time.sleep(5)
-            print('Retrying {0}'.format(file_url))
-        tries += 1
 
     return downloaded
 
 
-def download_assemblies(sample_ids, sample_paths, output_directory,
-                        minimum_file_size, timeout):
-    """ Downloads a set of assemblies from the FTP server of
-        the "ENA2018-bacteria-661k" study.
-
-        Parameters
-        ----------
-        sample_ids : list
-            List with the identifiers of the samples/assemblies
-            to download.
-        sample_paths : dict
-            Dictionary with sample/assemblies identifiers as
-            keys and FTP paths as values.
-        output_directory : str
-            Path to the output directory.
-
-        Returns
-        -------
-        failed : int
-            Number of failed downloads.
-    """
-
-    # list files in output directory
-    local_files = os.listdir(output_directory)
-
-    # create URLs to download
-    remote_urls = []
-    for sid in sample_ids:
-        sample_basename = sample_paths[sid].split('/')[-1]
-        # do not download files that have already been downloaded
-        if sample_basename not in local_files and sample_basename.split('.gz')[0] not in local_files:
-            sample_file = os.path.join(output_directory, sample_basename)
-            sample_url = ebi_ftp + sample_paths[sid]
-            remote_urls.append([sample_url, sample_file])
-
-    if len(remote_urls) < len(sample_ids):
-        print('{0} assemblies had already been downloaded.'
-              ''.format(len(sample_ids)-len(remote_urls)))
-
-    print('\nDownloading {0} assemblies...'.format(len(remote_urls)))
-    failed = 0
-    downloaded = 0
-    for url in remote_urls:
-        res = download_ftp_file(url[0], url[1], minimum_file_size, timeout)
-        if res is True:
-            downloaded += 1
-            print('Downloaded {0} ({1}/{2})'.format(url[1],
-                                                    downloaded,
-                                                    len(remote_urls)))
-        else:
-            failed += 1
-
-    return failed
-
-
 def main(metadata_table, paths_table, species_name, output_directory,
          ftp_download, abundance, genome_size, size_threshold,
-         max_contig_number, minimum_file_size, timeout,
-         mlst_species, known_st, any_quality):
+         max_contig_number, mlst_species, known_st, any_quality, stride,
+         retry, st):
 
     # read file with metadata
     metadata_lines = read_table(metadata_table)
@@ -207,7 +179,6 @@ def main(metadata_table, paths_table, species_name, output_directory,
 
     if len(species_lines) == 0:
         print('Did not find matches for {0}.'.format(species_name))
-        print('Please provide a valid species name.')
         sys.exit(0)
 
     # filter based on genome size
@@ -262,6 +233,15 @@ def main(metadata_table, paths_table, species_name, output_directory,
 
         print('{0} with known ST.'.format(len(species_lines)))
 
+    if st is not None:
+        with open(st, 'r') as desired_st:
+            d_st = desired_st.read().splitlines()
+            mlst = metadata_header.index('mlst')
+            species_lines = [line
+                             for line in species_lines
+                             if line[mlst] in d_st]
+            print('{0} with desired ST'.format(len(species_lines)))
+
     # filter based on quality level
     if any_quality is False:
         quality_index = metadata_header.index('high_quality')
@@ -273,12 +253,12 @@ def main(metadata_table, paths_table, species_name, output_directory,
 
     # get sample identifiers
     sample_ids = [line[0] for line in species_lines]
-    print('Selected {0} samples/assemblies that meet filtering '
-          'criteria.'.format(len(sample_ids)))
-
     if len(sample_ids) == 0:
         sys.exit('Did not find samples/assemblies that passed '
                  'filtering criteria.')
+    else:
+        print('Selected {0} samples/assemblies that meet filtering '
+              'criteria.'.format(len(sample_ids)))
 
     # create output directory
     if os.path.isdir(output_directory) is False:
@@ -289,17 +269,82 @@ def main(metadata_table, paths_table, species_name, output_directory,
         selected_lines = ['\t'.join(line)
                           for line in [metadata_header]+species_lines]
         selected_text = '\n'.join(selected_lines)
-        outfile.write(selected_text)
+        outfile.write(selected_text+'\n')
+
+    # download hashes file
+    local_checklist = os.path.join(output_directory, 'checklist.chk')
+    if os.path.isfile(local_checklist) is False:
+        print('Downloading checklist.chk...')
+        download_ftp_file(url_hash_file, local_checklist, None,
+                          retry, False, True)
+
+    # Putting checksums in dictionary
+    hashes_dict = {}
+    with open(local_checklist, 'r') as table:
+        lines = table.readlines()
+        for line in lines:
+            md5_hash, file_path = line.split('  ')
+            file_basename = file_path.split('/')[-1].split('.')[0]
+            hashes_dict[file_basename] = md5_hash
+
+    # get hashes for species samples
+    species_hashes = {i: hashes_dict[i] for i in sample_ids}
 
     if ftp_download is True:
-
         # read table with FTP paths
         ftp_lines = read_table(paths_table)
         sample_paths = {l[0]: l[1].split('/ebi/ftp')[1] for l in ftp_lines}
+        # get FTP paths only for selected samples
+        species_paths = {i: sample_paths[i] for i in sample_ids}
 
-        # download assemblies
-        download_assemblies(sample_ids, sample_paths, output_directory,
-                            minimum_file_size, timeout)
+        if stride:
+            interval_list = stride.split(':')
+            low = int(interval_list[0])-1
+            high = int(interval_list[1])
+
+            # make sure the interval doesn't go outside of the
+            # sample_ids list bounds
+            if high > len(sample_ids):
+                high = len(sample_ids)
+                # update the stride string for the zip archive name
+                stride = str(low + 1) + ':' + str(high)
+        else:
+            low = 0
+            high = len(species_paths)
+
+        # list files in output directory
+        local_files = os.listdir(output_directory)
+
+        # create URLs to download
+        remote_urls = []
+        for i in range(low, high):
+            sample_basename = sample_paths[sample_ids[i]].split('/')[-1]
+            # do not download files that have already been downloaded
+            if sample_basename not in local_files and sample_basename.split('.gz')[0] not in local_files:
+                sample_file = os.path.join(output_directory, sample_basename)
+                sample_url = ebi_ftp + sample_paths[sample_ids[i]]
+                remote_urls.append([sample_url, sample_file, hashes_dict[sample_ids[i]]])
+
+        sample_ids = sample_ids[low:high]
+
+        if len(remote_urls) < len(sample_ids):
+            print('{0} assemblies had already been downloaded.'
+                  ''.format(len(sample_ids)-len(remote_urls)))
+
+        print('\nDownloading {0} assemblies...'.format(len(remote_urls)))
+        failed = 0
+        downloaded = 0
+        for url in remote_urls:
+            res = download_ftp_file(*url, retry)
+            if res is True:
+                downloaded += 1
+                print('\r', 'Downloaded {0}/{1}'.format(downloaded,
+                                                        len(remote_urls)),
+                      end='')
+            else:
+                failed += 1
+
+        print('\nFailed download for {0} files.'.format(failed))
 
 
 def parse_arguments():
@@ -342,7 +387,7 @@ def parse_arguments():
                         required=False,
                         dest='abundance',
                         help='Minimum species abundance. Samples with species'
-                        ' abundance below this value are not selected.')
+                             ' abundance below this value are not selected.')
 
     parser.add_argument('-gs', '--genome-size', type=int,
                         required=False,
@@ -354,25 +399,12 @@ def parse_arguments():
                         dest='size_threshold',
                         help='Genome size can vary in size +/- this value.')
 
-    parser.add_argument('-mc', '--max-contig-number', type=int,
+    parser.add_argument('-mc', '--max_contig_number', type=int,
                         required=False,
                         dest='max_contig_number',
                         help='Maximum number of contigs. Assemblies with '
                              'a number of contigs greater than this value '
                              'are not selected.')
-
-    parser.add_argument('-mfs', '--minimum-file-size', type=int,
-                        required=False, default=500000,
-                        dest='minimum_file_size',
-                        help='Minimum file size for downloaded files. '
-                             'The process will retry downloading files '
-                             'that are smaller than this value.')
-
-    parser.add_argument('-t', '--timeout', type=int,
-                        required=False, default=30,
-                        dest='timeout',
-                        help='Maximum number of seconds for the '
-                             'download of a file.')
 
     parser.add_argument('--mlst-species', type=str,
                         required=False,
@@ -390,6 +422,28 @@ def parse_arguments():
                         dest='any_quality',
                         help='Download all assemblies, even the ones '
                              'that are not high quality.')
+
+    parser.add_argument('-stride', '--stride', type=str,
+                        required=False,
+                        dest='stride',
+                        help='Interval specifying which sample ids to '
+                             'download. Example: "1:2000" - This will '
+                             'download the first 2000 samples. Note: If '
+                             'you want to download from the first id, '
+                             'you have to put "1", not "0" in the lower '
+                             'value.')
+
+    parser.add_argument('-r', '--retry', type=int,
+                        required=False, dest='retry',
+                        default=7,
+                        help='Maximum number of retries when a '
+                             'download fails.')
+
+    parser.add_argument('--st', type=str,
+                        required=False, dest='st',
+                        default=None,
+                        help='Desired ST in a txt file,'
+                             ' one ST per line')
 
     args = parser.parse_args()
 
