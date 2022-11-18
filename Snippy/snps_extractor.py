@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+Purpose
+-------
+This script extracts relevant SNPs from Snippy output TSV files.
+It creates a TSV file with the SNPs identified in each relevant
+position per sample and a TSV file with a presence/absence
+matrix indicating if the SNPs identified match any of the relevant
+SNPs listed in the input SNP table.
 
 """
 
@@ -12,7 +19,7 @@ import argparse
 
 def main(input_files, output_directory, snps_table, ignore_terms):
 
-    ignore_terms = [] if ignore_terms is None else ignore_terms    
+    ignore_terms = [] if ignore_terms is None else ignore_terms
 
     if os.path.isdir(output_directory) is False:
         os.mkdir(output_directory)
