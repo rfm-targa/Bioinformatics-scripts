@@ -3,7 +3,6 @@
 """
 Purpose
 -------
-
 This module substitutes positions with a low depth of coverage
 in a Multiple Sequence Alignment with 'N'. It ignores gaps at
 the start and end of each aligned sequence. The depth of coverage
@@ -24,20 +23,19 @@ from Bio import SeqIO
 
 
 def import_depth(tsv_file):
-    """ Imports data from a TSV file.
+    """Import data from a TSV file.
 
-        Parameters
-        ----------
-        tsv_file : str
-            Path to the TSV file.
+    Parameters
+    ----------
+    tsv_file : str
+        Path to the TSV file.
 
-        Returns
-        -------
-        lines : list of list
-            List with one sublist per line in
-            the TSV file.
+    Returns
+    -------
+    lines : list of list
+        List with one sublist per line in
+        the TSV file.
     """
-
     with open(tsv_file, 'r') as tf:
         lines = list(csv.reader(tf, delimiter='\t'))
 
@@ -45,22 +43,20 @@ def import_depth(tsv_file):
 
 
 def import_seqs(fasta_file):
-    """ Imports sequences from a FASTA file.
+    """Import sequences from a FASTA file.
 
-        Parameters
-        ----------
-        fasta_file : str
-            Path to the FASTA file.
+    Parameters
+    ----------
+    fasta_file : str
+        Path to the FASTA file.
 
-        Returns
-        -------
-        seqs : list of list
+    Returns
+    -------
+    seqs : list of list
         List with one sublist per sequence in the
-        FASTA file. Each sublist has two elements:
-        The identifier/header of the sequence  (str)
-        and the sequence (str).
+        FASTA file. Each sublist the identifier/header
+        of the sequence (str) and the sequence (str).
     """
-
     seqs = []
     for record in SeqIO.parse(fasta_file, 'fasta'):
         seqid = record.id
@@ -70,21 +66,14 @@ def import_seqs(fasta_file):
     return seqs
 
 
-input_fasta = '/home/rfm/Desktop/rfm/Lab_Analyses/msa_masker_bug/input_example.fasta'
-depth_data = '/home/rfm/Desktop/rfm/Lab_Analyses/msa_masker_bug/depth_unzipped'
-output_fasta = '/home/rfm/Desktop/rfm/Lab_Analyses/msa_masker_bug/output_example.fasta'
-cutoff = 9
-mask_gaps = False
-
-
-def main(input_fasta, depth_data, output_fasta, cutoff, mask_gaps):
+def main(input_file, output_file, depth_files, depth_threshold, mask_gaps):
 
     start_date = dt.datetime.now()
     start_date_str = dt.datetime.strftime(start_date, '%Y-%m-%dT%H:%M:%S')
     print('Started at: {0}\n'.format(start_date_str))
 
     # import sequences in MSA FASTA file
-    msa_seqs = import_seqs(input_fasta)
+    msa_seqs = import_seqs(input_file)
 
     # keep reference and samples separate
     reference = msa_seqs[0]
@@ -96,25 +85,25 @@ def main(input_fasta, depth_data, output_fasta, cutoff, mask_gaps):
                                                        len(sample_ids)))
 
     # list depth files and match sample to depth file
-    if os.path.isdir(depth_data) is True:
-        depth_files = os.listdir(depth_data)
+    if os.path.isdir(depth_files) is True:
+        depth_files = os.listdir(depth_files)
         sample_map = {}
         for i in sample_ids:
             match = [f for f in depth_files if i in f]
             if len(match) > 0:
-                file = os.path.join(depth_data, match[0])
+                file = os.path.join(depth_files, match[0])
                 sample_map[i] = file
             else:
                 print('Could not find a depth file for '
                       'sample {0}'.format(i))
     # user provided a TSV file with sample to file correspondence
-    elif os.path.isfile(depth_data) is True:
-        with open(depth_data, 'r') as df:
+    elif os.path.isfile(depth_files) is True:
+        with open(depth_files, 'r') as df:
             lines = csv.reader(df, delimiter='\t')
             sample_map = {l[0]: l[1] for l in lines}
 
-    out_dir = os.path.dirname(output_fasta)
-    pos_basename = os.path.basename(output_fasta).split('.fasta')[0]
+    out_dir = os.path.dirname(output_file)
+    pos_basename = os.path.basename(output_file).split('.fasta')[0]
     pos_file = os.path.join(out_dir, pos_basename+'_pos')
 
     # determine gaps in reference
@@ -138,7 +127,7 @@ def main(input_fasta, depth_data, output_fasta, cutoff, mask_gaps):
         depth_info = import_depth(sample_map[seqid])
 
         # get positions with zero coverage
-        zero_cov = [d for d in depth_info if int(d[2]) <= cutoff]
+        zero_cov = [d for d in depth_info if int(d[2]) <= depth_threshold]
 
         # shift low depth positions based on gaps on reference
         for p in gaps:
@@ -186,7 +175,7 @@ def main(input_fasta, depth_data, output_fasta, cutoff, mask_gaps):
             pf.write(pos_info)
 
     # write masked sequences to FASTA
-    with open(output_fasta, 'w') as out:
+    with open(output_file, 'w') as out:
         reference_record = ['>{0}\n{1}'.format(reference[0], reference[1])]
         samples_records = ['>{0}\n{1}'.format(s[0], s[1]) for s in samples]
         records = reference_record + samples_records
@@ -208,16 +197,16 @@ def parse_arguments():
     def msg(name=None):
 
         # simple command with default options
-        simple_cmd = ('   python msa_low_cov_masker.py -i input.fasta '
+        simple_cmd = ('   python msa_masker.py -i input.fasta '
                       '-df depth_files -o out.fasta')
 
         # different depth of coverage value
-        depth_command = ('  python msa_low_cov_masker.py -i input.fasta '
-                         '-df depth_files -o out.fasta --c 10')
+        depth_command = ('  python msa_masker.py -i input.fasta '
+                         '-df depth_files -o out.fasta --dc 10')
 
         # mask gaps contained in sequences
-        gaps_command = ('  python msa_low_cov_masker.py -i input.fasta '
-                        '-df depth_files -o out.fasta --c 10 --g')
+        gaps_command = ('  python msa_masker.py -i input.fasta '
+                        '-df depth_files -o out.fasta --dc 10 --mg')
 
         usage_msg = ('\nSimple command with default options:\n\n{0}\n'
                      '\nDifferent depth of coverage value:\n\n{1}\n'
@@ -232,12 +221,18 @@ def parse_arguments():
                                      formatter_class=argparse.RawDescriptionHelpFormatter,
                                      usage=msg())
 
-    parser.add_argument('-i', type=str, required=True,
-                        dest='input_fasta',
+    parser.add_argument('-i', '--input-file', type=str, required=True,
+                        dest='input_file',
                         help='Path to the input FASTA file that contains '
                              'the Multiple Sequence Alignment.')
 
-    parser.add_argument('-df', type=str, required=True,
+    parser.add_argument('-o', '--output-file', type=str, required=True,
+                        dest='output_file',
+                        help='Path to the output FASTA file '
+                             'to which the masked sequences '
+                             'will be saved.')
+
+    parser.add_argument('-df', '--depth-files', type=str, required=True,
                         dest='depth_files',
                         help='Path to the directory with TSV '
                              'files that contain depth of '
@@ -245,30 +240,23 @@ def parse_arguments():
                              'sample (files must contain the '
                              'identifier of the sample in the name).')
 
-    parser.add_argument('-o', type=str, required=True,
-                        dest='output_fasta',
-                        help='Path to the output FASTA file '
-                             'to which the masked sequences '
-                             'will be saved.')
-
-    parser.add_argument('--c', type=int, required=False,
-                        default=0, dest='cutoff',
+    parser.add_argument('--dc', '--depth-threshold', type=int, required=False,
+                        default=0, dest='depth_threshold',
                         help='Positions with a depth value equal '
                              'or below the value of this argument '
                              'will be substituted by N (default=0).')
 
-    parser.add_argument('--g', required=False,
+    parser.add_argument('--mg', '--mask-gaps', required=False,
                         action='store_true', dest='mask_gaps',
                         help='If the process should mask gaps (-) '
                              'with low depth (default=False).')
 
     args = parser.parse_args()
 
-    return [args.input_fasta, args.depth_files,
-            args.output_fasta, args.cutoff, args.mask_gaps]
+    return args
 
 
 if __name__ == "__main__":
 
     args = parse_arguments()
-    main(args[0], args[1], args[2], args[3], args[4])
+    main(**vars(args))
