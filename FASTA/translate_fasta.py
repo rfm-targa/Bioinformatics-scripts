@@ -2,14 +2,6 @@
 # -*- coding: utf-8 -*-
 
 """
-AUTHOR
-    
-    Rafael Mamede
-    github: @rfm-targa
-
-DESCRIPTION
-    
-    
     
 """
 
@@ -22,35 +14,41 @@ from Bio.Seq import Seq
 
 
 def reverse_str(string):
-    """ Reverse character order in input string.
+    """Reverse character order in input string.
 
-        Args:
-            string (str): string to be reversed.
+    Parameters
+    ----------
+    string : str
+        String to be reversed.
 
-        Returns:
-            revstr (str): reverse of input string.
+    Returns
+    -------
+    revstr : str
+        Reverse of input string.
     """
-
     revstr = string[::-1]
 
     return revstr
 
 
 def reverse_complement(dna_sequence):
-    """ Determines the reverse complement of given DNA strand.
+    """Determine the reverse complement of given DNA strand.
 
-        Args:
-            strDNA (str): string representing a DNA sequence.
+    Parameters
+    ----------
+    strDNA : str
+        String representing a DNA sequence.
 
-        Returns:
-            revC_dna (str): the reverse complement of the DNA sequence, without
-            lowercase letters.
+    Returns
+    -------
+    revC_dna : str
+        The reverse complement of the DNA sequence, without
+        lowercase letters.
 
-        Example:
-            >>> reverse_complement('ATCGgcaNn')
-            'NNTGCCGAT'
+    Example:
+        >>> reverse_complement('ATCGgcaNn')
+        'NNTGCCGAT'
     """
-
     base_complement = {'A': 'T', 'C': 'G', 'G': 'C', 'T': 'A',
                        'a': 'T', 'c': 'G', 'g': 'C', 't': 'A'}
 
@@ -74,17 +72,21 @@ def reverse_complement(dna_sequence):
 
 
 def translate_sequence(dna_str, table_id):
-    """ Translate a DNA sequence using the BioPython package.
+    """Translate a DNA sequence using the BioPython package.
 
-        Args:
-            dna_str (str): DNA sequence as string type.
-            table_id (int): translation table identifier.
+    Parameters
+    ----------
+    dna_str : str
+        DNA sequence as string type.
+    table_id : int
+        Translation table identifier.
 
-        Returns:
-            protseq (str): protein sequence created by translating
-            the input DNA sequence.
+    Returns
+    -------
+    protseq : str
+        Protein sequence created by translating the input
+        DNA sequence.
     """
-
     myseq_obj = Seq(dna_str)
     protseq = Seq.translate(myseq_obj, table=table_id, cds=True)
 
@@ -92,23 +94,28 @@ def translate_sequence(dna_str, table_id):
 
 
 def translate_dna_aux(dna_sequence, method, table_id):
-    """ Tries to translate an input DNA sequence in specified orientation
-        and stores exceptions when the input sequence cannot be translated.
+    """Attempt to translate an input DNA sequence.
 
-        Args:
-            dna_sequence (str): string representing a DNA sequence.
-            method (str): a string specifying the way the sequence will
-            be oriented to attempt translation.
-            table_id (int): translation table identifier.
+    Parameters
+    ----------
+    dna_sequence : str
+        String representing a DNA sequence.
+    method : str
+        A string specifying the way the sequence will be
+        oriented to attempt translation.
+    table_id : int
+        Translation table identifier.
 
-        Returns:
-            List with following elements if translation is successful:
-                protseq (str): string representing the translated DNA sequence.
-                myseq (str): string representing the DNA sequence in the
-                orientation used to translate it.
-            Otherwise, returns string derived from captured exception.
+    Returns
+    -------
+    List with following elements if translation is successful:
+        protseq : str
+            String representing the translated DNA sequence.
+        myseq : str
+            String representing the DNA sequence in the
+            orientation used to translate it.
+        Otherwise, returns string derived from captured exception.
     """
-
     myseq = dna_sequence
     # try to translate original sequence
     if method == 'original':
@@ -143,20 +150,21 @@ def translate_dna_aux(dna_sequence, method, table_id):
 
 
 def check_str_alphabet(string, alphabet):
-    """ Determine if a string only has characters from specified
-        alphabet.
+    """Determine if a string only has characters from specified alphabet.
 
-        Args:
-            string (str): input string.
-            alphabet (str): string that has all characters from desired
-            alphabet.
+    Parameters
+    ----------
+    string : str
+        Input string.
+    alphabet : str
+        String that has all characters from desired alphabet.
 
-        Returns:
-            "True" if sequence only has characters from specified
-            alphabet and string "ambiguous or invalid characters" if
-            it any of its characters is not in the alphabet.
+    Returns
+    -------
+    "True" if sequence only has characters from specified
+    alphabet and string "ambiguous or invalid characters" if
+    it any of its characters is not in the alphabet.
     """
-
     valid_chars = alphabet
     if all(n in valid_chars for n in string) is True:
         return True
@@ -165,20 +173,22 @@ def check_str_alphabet(string, alphabet):
 
 
 def check_str_multiple(string, number):
-    """ Determine if length of input string is multiple of
-        a specified number.
+    """Determine if length of input string is multiple of a specified number.
 
-        Args:
-            string (str): input string.
-            number (int): integer that will be used to check if sequence
-            length is multiple of.
+    Parameters
+    ----------
+    string : str
+        Input string.
+    number : int
+        Integer that will be used to check if sequence length
+        is multiple of.
 
-        Returns:
-            "True" if the length of the sequence is a multiple of the
-            specified number and "sequence length is not a multiple of number"
-            if condition is not satisfied.
+    Returns
+    -------
+    "True" if the length of the sequence is a multiple of the
+    specified number and "sequence length is not a multiple of number"
+    if condition is not satisfied.
     """
-
     if len(string) % number == 0:
         return True
     else:
@@ -186,28 +196,33 @@ def check_str_multiple(string, number):
 
 
 def translate_dna(dna_sequence, table_id):
-    """ Checks if sequence is valid and attempts to translate it,
-        calling several functions to ensure that the sequence only has
+    """Check if sequence is valid and attempts to translate it.
+
+    Calls several functions to ensure that the sequence only has
         'ACTG', is multiple of 3 and that it can be translated in any of 4
         different orientations. Stores exceptions so that it is possible to
         understand the sequence could not be translated.
 
-        Args:
-            dna_sequence (str):
-            table_id (int):
+    Parameters
+    ----------
+    dna_sequence : str
+        String representing a DNA sequence.
+    table_id (int):
+        Translation table identifier.
 
-        Returns:
-            If the sequence can be translated,
-            a list with following elements:
-                sequence (list): a list with two elemets, the protein sequence
-                and the DNA sequence in the correct orientation.
-                coding_strand (str): the strand orientation that had could be
-                translated.
-            Otherwise:
-                exception_str (str): a string containing the exceptions that
-                determined that the sequence could not be translated.
+    Returns
+    -------
+    If the sequence can be translated, a list with following elements:
+        sequence : list
+            A list with two elemets, the protein sequence and the DNA
+            sequence in the correct orientation.
+        coding_strand : str
+            The strand orientation that had could be translated.
+        Otherwise:
+            exception_str : str
+                A string containing the exceptions that determined
+                that the sequence could not be translated.
     """
-
     original_seq = dna_sequence.upper()
     exception_collector = []
     strands = ['sense', 'antisense', 'revsense', 'revantisense']
@@ -251,33 +266,40 @@ def translate_dna(dna_sequence, table_id):
 
 
 def retranslate(sequence, method, table_id, strands, exception_collector):
-    """ Sends sequence for translation and collects exceptions when
-        the sequence cannot be translated.
+    """Attempt to translate a DNA sequence.
 
-        Args:
-            sequence (str): string representing a DNA sequence.
-            method (str): a string specifying the sequence orientation
-            that should be used to attempt translation.
-            table_id (int): translation table identifier.
-            strands (list): list with 4 different orientations that can
-            be checked.
-            exception_collector (list): list used to store all exceptions
-            arising from translation attempts.
+    Parameters
+    ----------
+    sequence : str
+        String representing a DNA sequence.
+    method : str
+        A string specifying the sequence orientation that should be
+        used to attempt translation.
+    table_id : int
+        Translation table identifier.
+    strands : list
+        List with 4 different orientations that can be checked.
+    exception_collector : list
+        List used to store all exceptions arising from translation
+        attempts.
 
-        Returns:
-            A list with following elements, if the sequence can be translated:
-                translated_seq (list): a list with the protein sequence and
-                with the DNA sequence in the orientation used for translation.
-                exception_collector (list): a list with the exceptions that are
-                captured when the sequence could not be translated.
-            Otherwise:
-                translated_seq (str): a string with the exception/reason why
-                the sequence could not be translated.
-                exception_collector (list): list with all exception that have
-                been captured during translation attempts of the current
-                sequence.
+    Returns
+    -------
+    A list with following elements, if the sequence can be translated:
+        translated_seq : list
+            A list with the protein sequence and with the DNA sequence
+            in the orientation used for translation.
+        exception_collector : list
+            A list with the exceptions that are captured when the
+            sequence could not be translated.
+        Otherwise:
+            translated_seq : str
+                A string with the exception/reason why the sequence
+                could not be translated.
+            exception_collector : list
+                List with all exception that have been captured during
+                translation attempts of the current sequence.
     """
-
     translated_seq = translate_dna_aux(sequence, method, table_id)
     if not isinstance(translated_seq, list):
         exception_collector.append('{0}({1})'.format(strands,
@@ -286,27 +308,7 @@ def retranslate(sequence, method, table_id, strands, exception_collector):
     return [translated_seq, exception_collector]
 
 
-def parse_arguments():
-    """
-    """
-
-    parser = argparse.ArgumentParser(description=__doc__,
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
-
-    parser.add_argument('-i', '--input_file', type=str, required=True, dest='input_file',
-                        help='')
-    
-    parser.add_argument('-t', '--translation_table', type=int, required=False, dest='translation_table',
-                        default=11, help='')
-
-    args = parser.parse_args()
-
-    return [args.input_file, args.translation_table]
-
-
 def main(input_file, translation_table):
-    """
-    """
 
     parent_dir = os.path.dirname(input_file)
     basename = os.path.basename(input_file)
@@ -318,15 +320,14 @@ def main(input_file, translation_table):
     with open(protein_file, 'a') as pf:
         for record in SeqIO.parse(input_file, 'fasta'):
             total += 1
-            #header = record.id
             header = record.description
             dna = str(record.seq)
             translation_info = translate_dna(dna, translation_table)
             if isinstance(translation_info, str) is False:
                 protein = str(translation_info[0][0])
-            
+
                 new_record = '>{0}\n{1}\n'.format(header, protein)
-            
+
                 pf.write(new_record)
                 translated += 1
             else:
@@ -338,7 +339,28 @@ def main(input_file, translation_table):
     print('Translated {0}/{1}'.format(translated, total))
 
 
+def parse_arguments():
+
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+
+    parser.add_argument('-i', '--input-file', type=str,
+                        required=True, dest='input_file',
+                        help='Input FASTA file that contains DNA sequences '
+                             'to be translated.')
+
+    parser.add_argument('-t', '--translation-table', type=int,
+                        required=False, default=11,
+                        dest='translation_table',
+                        help='Genetic code used to translate the DNA '
+                             'sequences.')
+
+    args = parser.parse_args()
+
+    return args
+
+
 if __name__ == "__main__":
 
     args = parse_arguments()
-    main(args[0], args[1])
+    main(**vars(args))
