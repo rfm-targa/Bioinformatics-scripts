@@ -1,3 +1,3 @@
-# BioinfUtils
+# Bioinformatics-scripts
 
-Collection of Python scripts to perform various Bioinformatics tasks.
+Collection of scripts to perform Bioinformatics tasks.
